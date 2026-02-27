@@ -2,7 +2,13 @@
   "150": {
     "message": "Token de acesso ausente, inv\u00e1lido, expirado ou usu\u00e1rio do token n\u00e3o existe mais"
   },
+  "154": {
+    "message": "Token de acesso ausente, inv\u00e1lido, expirado ou usu\u00e1rio do token n\u00e3o existe mais"
+  },
   "186": {
+    "id": "id deve ter exatamente 16 caracteres alfanum\u00e9ricos"
+  },
+  "190": {
     "id": "id deve ter exatamente 16 caracteres alfanum\u00e9ricos"
   }
 }
