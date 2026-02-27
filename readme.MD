@@ -138,6 +138,10 @@ python --version
 pip --version
 ```
 
+### Comando para rodar os testes no terminal:
+```bash
+python -m pytest tests
+```
 ---
 
 ## 🐍 Python no Projeto
@@ -230,7 +234,7 @@ As configurações padrão de execução já estão pré-definidas no `pytest.in
 ### Executar suíte completa
 
 ```bash
-pytest
+python -m pytest tests
 ```
 
 ### Executar funcionalidade específica (Ex: login)
@@ -422,11 +426,40 @@ http_status = response.status
 
 Após aplicar localmente a suíte ou durante a pipeline, o Allure se integra embutidamente com Pytest. O projeto aponta suas saídas para o diretório de dados em `/allure-results`.
 
-Para transformar os dados JSON de saída do Pytest na interface gráfica robusta do allure:
+### Instalação do Allure CLI
+
+Para usar o `allure serve` localmente, instale o Allure CLI globalmente via **npm** (requer Node.js 18+):
 
 ```bash
+npm install -g allure-commandline
+```
+
+Verifique a instalação:
+
+```bash
+allure --version
+```
+
+> Alternativamente, no Windows com Scoop: `scoop install allure`  
+> No macOS com Homebrew: `brew install allure`
+
+### Gerando e visualizando o relatório
+
+Para transformar os dados JSON de saída do Pytest na interface gráfica robusta do Allure:
+
+```bash
+# Executar os testes e salvar resultados
+pytest tests --alluredir=allure-results
+
+# Abrir relatório interativo no browser
 allure serve allure-results
 ```
+
+> Para gerar os arquivos HTML estáticos (ex: para deploy em CI/CD):
+> ```bash
+> allure generate allure-results --clean -o allure-report
+> allure open allure-report
+> ```
 
 O dashboard exibe:
 - ✅ Cenários OK, Skipped e Failed detalhadamente

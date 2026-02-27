@@ -1,7 +1,11 @@
 {
     "python.testing.pytestArgs": [
-        "tests"
+        "."
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "python.defaultInterpreterPath": "C:\\Python314\\python.exe",
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "terminal.integrated.inheritEnv": false,
+
 }

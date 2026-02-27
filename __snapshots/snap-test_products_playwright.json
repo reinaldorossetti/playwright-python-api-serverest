@@ -1,0 +1,26 @@
+{
+  "113": {
+    "message": "J\u00e1 existe produto com esse nome"
+  },
+  "215": {
+    "message": "Token de acesso ausente, inv\u00e1lido, expirado ou usu\u00e1rio do token n\u00e3o existe mais"
+  },
+  "286": {
+    "message": "Registro exclu\u00eddo com sucesso"
+  },
+  "292": {
+    "message": "Produto n\u00e3o encontrado"
+  },
+  "367": {
+    "idCarrinhos": [
+      "7ykLvWEBf82lAafw"
+    ],
+    "message": "N\u00e3o \u00e9 permitido excluir produto que faz parte de carrinho"
+  },
+  "405": {
+    "message": "Rota exclusiva para administradores"
+  },
+  "406": {
+    "message": "Rota exclusiva para administradores"
+  }
+}

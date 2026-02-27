@@ -4,6 +4,7 @@ from pathlib import Path
 
 import allure
 import pytest
+from assertpy import assert_that
 from playwright.sync_api import APIRequestContext
 
 from tests.utils.api_utils import JSON_HEADERS, parse_response_body, post_json
@@ -39,14 +40,14 @@ def test_ct01_login_with_valid_credentials_and_validate_token(api_request: APIRe
     password = "SenhaSegura@123"
 
     create_resp = create_user(api_request, email, password, admin=False)
-    assert create_resp.status == 201, "User creation should return 201"
+    assert_that(create_resp.status).is_equal_to(201)
 
     login_resp = post_json(api_request, "/login", {"email": email, "password": password})
 
-    assert login_resp.status == 200
+    assert_that(login_resp.status).is_equal_to(200)
     body = parse_response_body(login_resp)
-    assert body["message"] == "Login realizado com sucesso"
-    assert body.get("authorization") is not None
+    assert_that(body["message"]).is_equal_to("Login realizado com sucesso")
+    assert_that(body.get("authorization")).is_not_none()
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -60,30 +61,28 @@ def test_ct02_login_with_invalid_credentials(api_request: APIRequestContext):
         },
     )
 
-    assert resp.status == 401
+    assert_that(resp.status).is_equal_to(401)
     response_body = parse_response_body(resp)
-    assert response_body["message"] == "Email e/ou senha inválidos"
-    assert response_body.get("authorization") is None
+    assert_that(response_body).snapshot()
 
 
 @allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.parametrize("_row", load_required_fields_rows())
 def test_ct03_validate_required_fields_on_login(_row: dict[str, str], api_request: APIRequestContext):
     resp1 = post_json(api_request, "/login", {"email": "", "password": "senha123"})
-    assert resp1.status == 400
+    assert_that(resp1.status).is_equal_to(400)
     body1 = parse_response_body(resp1)
-    assert body1.get("email") is not None
+    assert_that(body1).snapshot()
 
     resp2 = post_json(api_request, "/login", {"email": "test@email.com", "password": ""})
-    assert resp2.status == 400
+    assert_that(resp2.status).is_equal_to(400)
     body2 = parse_response_body(resp2)
-    assert body2.get("password") is not None
+    assert_that(body2).snapshot()
 
     resp3 = post_json(api_request, "/login", {"email": "", "password": ""})
-    assert resp3.status == 400
+    assert_that(resp3.status).is_equal_to(400)
     body3 = parse_response_body(resp3)
-    assert body3.get("email") is not None
-    assert body3.get("password") is not None
+    assert_that(body3).snapshot()
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -92,13 +91,13 @@ def test_ct04_login_and_use_token_in_protected_route(api_request: APIRequestCont
     user_password = "SenhaSegura@123"
 
     create_resp = create_user(api_request, user_email, user_password, admin=False)
-    assert create_resp.status == 201
+    assert_that(create_resp.status).is_equal_to(201)
 
     login_resp = post_json(api_request, "/login", {"email": user_email, "password": user_password})
-    assert login_resp.status == 200
+    assert_that(login_resp.status).is_equal_to(200)
 
     login_body = parse_response_body(login_resp)
-    assert login_body["message"] == "Login realizado com sucesso"
+    assert_that(login_body["message"]).is_equal_to("Login realizado com sucesso")
     auth_token = login_body["authorization"]
 
     product_payload = {
@@ -114,9 +113,9 @@ def test_ct04_login_and_use_token_in_protected_route(api_request: APIRequestCont
         data=json.dumps(product_payload, ensure_ascii=False),
     )
 
-    assert product_resp.status == 403
+    assert_that(product_resp.status).is_equal_to(403)
     product_body = parse_response_body(product_resp)
-    assert product_body["message"] == "Rota exclusiva para administradores"
+    assert_that(product_body).snapshot()
 
 
 @allure.severity(allure.severity_level.NORMAL)
@@ -124,6 +123,6 @@ def test_ct04_login_and_use_token_in_protected_route(api_request: APIRequestCont
 def test_ct05_validate_invalid_email_format(invalid_email: str, api_request: APIRequestContext):
     resp = post_json(api_request, "/login", {"email": invalid_email, "password": "senha123"})
 
-    assert resp.status == 400
+    assert_that(resp.status).is_equal_to(400)
     response_body = parse_response_body(resp)
-    assert response_body.get("email") is not None
+    assert_that(response_body).contains_key("email")

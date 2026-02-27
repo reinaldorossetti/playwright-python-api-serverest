@@ -1,0 +1,18 @@
+{
+  "118": {
+    "message": "Rota exclusiva para administradores"
+  },
+  "66": {
+    "message": "Email e/ou senha inv\u00e1lidos"
+  },
+  "75": {
+    "email": "email n\u00e3o pode ficar em branco"
+  },
+  "80": {
+    "password": "password n\u00e3o pode ficar em branco"
+  },
+  "85": {
+    "email": "email n\u00e3o pode ficar em branco",
+    "password": "password n\u00e3o pode ficar em branco"
+  }
+}

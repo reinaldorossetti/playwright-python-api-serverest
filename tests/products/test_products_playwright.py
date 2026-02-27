@@ -4,6 +4,7 @@ import uuid
 
 import allure
 import pytest
+from assertpy import assert_that
 from playwright.sync_api import APIRequestContext
 
 from tests.utils.api_utils import JSON_HEADERS, load_json_resource, parse_response_body, post_json, put_json
@@ -22,7 +23,7 @@ def get_admin_token(request: APIRequestContext) -> str:
 
     post_json(request, "/usuarios", user_payload)
     login_resp = post_json(request, "/login", {"email": email, "password": password})
-    assert login_resp.status == 200
+    assert_that(login_resp.status).is_equal_to(200)
 
     login_body = parse_response_body(login_resp)
     return login_body["authorization"]
@@ -31,21 +32,21 @@ def get_admin_token(request: APIRequestContext) -> str:
 @allure.severity(allure.severity_level.CRITICAL)
 def test_ct01_list_all_products_and_validate_json_structure(api_request: APIRequestContext):
     resp = api_request.get("/produtos")
-    assert resp.status == 200
+    assert_that(resp.status).is_equal_to(200)
 
     body = parse_response_body(resp)
     quantidade = body["quantidade"]
     produtos = body["produtos"]
 
-    assert quantidade >= 0
-    assert produtos is not None
+    assert_that(quantidade).is_greater_than_or_equal_to(0)
+    assert_that(produtos).is_not_none()
 
     for product in produtos:
-        assert "nome" in product
-        assert "preco" in product
-        assert "descricao" in product
-        assert "quantidade" in product
-        assert "_id" in product
+        assert_that(product).contains_key("nome")
+        assert_that(product).contains_key("preco")
+        assert_that(product).contains_key("descricao")
+        assert_that(product).contains_key("quantidade")
+        assert_that(product).contains_key("_id")
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -65,21 +66,21 @@ def test_ct02_create_new_product_as_administrator(api_request: APIRequestContext
         data=json.dumps(product_payload, ensure_ascii=False),
     )
 
-    assert create_resp.status == 201
+    assert_that(create_resp.status).is_equal_to(201)
 
     create_body = parse_response_body(create_resp)
-    assert create_body["message"] == "Cadastro realizado com sucesso"
-    assert create_body.get("_id") is not None
+    assert_that(create_body["message"]).is_equal_to("Cadastro realizado com sucesso")
+    assert_that(create_body.get("_id")).is_not_none()
 
     product_id = create_body["_id"]
 
     get_resp = api_request.get(f"/produtos/{product_id}")
-    assert get_resp.status == 200
+    assert_that(get_resp.status).is_equal_to(200)
 
     product = parse_response_body(get_resp)
-    assert product["nome"] == product_name
-    assert product["preco"] == 250
-    assert product["quantidade"] == 100
+    assert_that(product["nome"]).is_equal_to(product_name)
+    assert_that(product["preco"]).is_equal_to(250)
+    assert_that(product["quantidade"]).is_equal_to(100)
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -99,32 +100,32 @@ def test_ct03_validate_error_on_duplicate_product_name(api_request: APIRequestCo
         headers={**JSON_HEADERS, "Authorization": token},
         data=json.dumps(product_payload, ensure_ascii=False),
     )
-    assert first.status == 201
+    assert_that(first.status).is_equal_to(201)
 
     second = api_request.post(
         "/produtos",
         headers={**JSON_HEADERS, "Authorization": token},
         data=json.dumps(product_payload, ensure_ascii=False),
     )
-    assert second.status == 400
+    assert_that(second.status).is_equal_to(400)
 
     second_body = parse_response_body(second)
-    assert second_body["message"] == "Já existe produto com esse nome"
+    assert_that(second_body).snapshot()
 
 
 @allure.severity(allure.severity_level.NORMAL)
 def test_ct04_search_for_products_with_filters(api_request: APIRequestContext):
     resp = api_request.get("/produtos?nome=Logitech")
-    assert resp.status == 200
+    assert_that(resp.status).is_equal_to(200)
 
     body = parse_response_body(resp)
     produtos = body["produtos"]
     if produtos:
         for product in produtos:
-            assert "Logitech" in product["nome"]
+            assert_that(product["nome"]).contains("Logitech")
 
     price_resp = api_request.get("/produtos?preco=100")
-    assert price_resp.status == 200
+    assert_that(price_resp.status).is_equal_to(200)
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -144,7 +145,7 @@ def test_ct05_update_existing_product(api_request: APIRequestContext):
         headers={**JSON_HEADERS, "Authorization": token},
         data=json.dumps(initial_product, ensure_ascii=False),
     )
-    assert create_resp.status == 201
+    assert_that(create_resp.status).is_equal_to(201)
 
     create_body = parse_response_body(create_resp)
     product_id = create_body["_id"]
@@ -162,23 +163,23 @@ def test_ct05_update_existing_product(api_request: APIRequestContext):
         updated_product,
         headers={"Authorization": token},
     )
-    assert update_resp.status == 200
+    assert_that(update_resp.status).is_equal_to(200)
 
     update_body = parse_response_body(update_resp)
-    assert update_body["message"] == "Registro alterado com sucesso"
+    assert_that(update_body["message"]).is_equal_to("Registro alterado com sucesso")
 
     get_resp = api_request.get(f"/produtos/{product_id}")
-    assert get_resp.status == 200
+    assert_that(get_resp.status).is_equal_to(200)
     product = parse_response_body(get_resp)
-    assert product["preco"] == 200
-    assert product["descricao"] == "Updated description"
-    assert product["quantidade"] == 75
+    assert_that(product["preco"]).is_equal_to(200)
+    assert_that(product["descricao"]).is_equal_to("Updated description")
+    assert_that(product["quantidade"]).is_equal_to(75)
 
 
 @allure.severity(allure.severity_level.NORMAL)
 def test_ct06_validate_price_calculations_and_comparisons(api_request: APIRequestContext):
     resp = api_request.get("/produtos")
-    assert resp.status == 200
+    assert_that(resp.status).is_equal_to(200)
 
     body = parse_response_body(resp)
     produtos = body["produtos"]
@@ -192,10 +193,10 @@ def test_ct06_validate_price_calculations_and_comparisons(api_request: APIReques
     min_price = min(prices, default=0)
 
     for price in prices:
-        assert price > 0
-        assert price < 100000
+        assert_that(price).is_greater_than(0)
+        assert_that(price).is_less_than(100000)
 
-    assert max_price >= min_price
+    assert_that(max_price).is_greater_than_or_equal_to(min_price)
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -209,9 +210,9 @@ def test_ct07_create_product_without_token(api_request: APIRequestContext):
 
     resp = post_json(api_request, "/produtos", product_payload)
 
-    assert resp.status == 401
+    assert_that(resp.status).is_equal_to(401)
     body = parse_response_body(resp)
-    assert body["message"] == "Token de acesso ausente, inválido, expirado ou usuário do token não existe mais"
+    assert_that(body).snapshot()
 
 
 @allure.severity(allure.severity_level.NORMAL)
@@ -233,13 +234,13 @@ def test_ct08_validate_required_fields_when_creating_product(number_field: int, 
         data=json.dumps(payload, ensure_ascii=False),
     )
 
-    assert resp.status == 400
+    assert_that(resp.status).is_equal_to(400)
 
 
 @allure.severity(allure.severity_level.MINOR)
 def test_ct09_work_with_complex_json_data(api_request: APIRequestContext):
     resp = api_request.get("/produtos")
-    assert resp.status == 200
+    assert_that(resp.status).is_equal_to(200)
 
     body = parse_response_body(resp)
     produtos = body["produtos"]
@@ -251,9 +252,9 @@ def test_ct09_work_with_complex_json_data(api_request: APIRequestContext):
     medium_products = [p for p in produtos if 100 <= float(p["preco"]) < 500]
     expensive_products = [p for p in produtos if float(p["preco"]) >= 500]
 
-    assert cheap_products is not None
-    assert medium_products is not None
-    assert expensive_products is not None
+    assert_that(cheap_products).is_not_none()
+    assert_that(medium_products).is_not_none()
+    assert_that(expensive_products).is_not_none()
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -273,22 +274,22 @@ def test_ct10_delete_existing_product(api_request: APIRequestContext):
         headers={**JSON_HEADERS, "Authorization": token},
         data=json.dumps(product_payload, ensure_ascii=False),
     )
-    assert create_resp.status == 201
+    assert_that(create_resp.status).is_equal_to(201)
 
     create_body = parse_response_body(create_resp)
     product_id = create_body["_id"]
 
     delete_resp = api_request.delete(f"/produtos/{product_id}", headers={"Authorization": token})
-    assert delete_resp.status == 200
+    assert_that(delete_resp.status).is_equal_to(200)
 
     delete_body = parse_response_body(delete_resp)
-    assert delete_body["message"] == "Registro excluído com sucesso"
+    assert_that(delete_body).snapshot()
 
     get_resp = api_request.get(f"/produtos/{product_id}")
-    assert get_resp.status == 400
+    assert_that(get_resp.status).is_equal_to(400)
 
     get_body = parse_response_body(get_resp)
-    assert get_body["message"] == "Produto não encontrado"
+    assert_that(get_body).snapshot()
 
 
 @allure.severity(allure.severity_level.NORMAL)
@@ -304,10 +305,10 @@ def test_ct11_create_product_from_fixed_json_payload(api_request: APIRequestCont
         data=json.dumps(product_payload, ensure_ascii=False),
     )
 
-    assert resp.status == 201
+    assert_that(resp.status).is_equal_to(201)
     body = parse_response_body(resp)
-    assert body["message"] == "Cadastro realizado com sucesso"
-    assert body.get("_id") is not None
+    assert_that(body["message"]).is_equal_to("Cadastro realizado com sucesso")
+    assert_that(body.get("_id")).is_not_none()
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -326,7 +327,7 @@ def test_ct12_prevent_deleting_product_in_cart(api_request: APIRequestContext):
         headers={**JSON_HEADERS, "Authorization": admin_token},
         data=json.dumps(product_payload, ensure_ascii=False),
     )
-    assert create_product_resp.status == 201
+    assert_that(create_product_resp.status).is_equal_to(201)
 
     create_product_body = parse_response_body(create_product_resp)
     product_id = create_product_body["_id"]
@@ -344,7 +345,7 @@ def test_ct12_prevent_deleting_product_in_cart(api_request: APIRequestContext):
     post_json(api_request, "/usuarios", user_data)
 
     login_resp = post_json(api_request, "/login", {"email": user_email, "password": user_password})
-    assert login_resp.status == 200
+    assert_that(login_resp.status).is_equal_to(200)
 
     login_body = parse_response_body(login_resp)
     user_token = login_body["authorization"]
@@ -357,13 +358,14 @@ def test_ct12_prevent_deleting_product_in_cart(api_request: APIRequestContext):
         headers={**JSON_HEADERS, "Authorization": user_token},
         data=json.dumps(cart_body, ensure_ascii=False),
     )
-    assert cart_resp.status == 201
+    assert_that(cart_resp.status).is_equal_to(201)
 
     delete_resp = api_request.delete(f"/produtos/{product_id}", headers={"Authorization": admin_token})
-    assert delete_resp.status == 400
+    assert_that(delete_resp.status).is_equal_to(400)
 
     delete_body = parse_response_body(delete_resp)
-    assert delete_body["message"] == "Não é permitido excluir produto que faz parte de carrinho"
+    assert_that(delete_body["message"]).is_equal_to("Não é permitido excluir produto que faz parte de carrinho")
+    assert_that(delete_body.get("idCarrinhos")).is_not_none().is_not_empty()
 
 
 @allure.severity(allure.severity_level.CRITICAL)
@@ -381,7 +383,7 @@ def test_ct13_restrict_product_creation_to_administrators_only(api_request: APIR
     post_json(api_request, "/usuarios", user_data)
 
     login_resp = post_json(api_request, "/login", {"email": user_email, "password": user_password})
-    assert login_resp.status == 200
+    assert_that(login_resp.status).is_equal_to(200)
 
     login_body = parse_response_body(login_resp)
     non_admin_token = login_body["authorization"]
@@ -399,6 +401,6 @@ def test_ct13_restrict_product_creation_to_administrators_only(api_request: APIR
         data=json.dumps(product_data, ensure_ascii=False),
     )
 
-    assert product_resp.status == 403
+    assert_that(product_resp.status).is_equal_to(403)
     product_body = parse_response_body(product_resp)
-    assert product_body["message"] == "Rota exclusiva para administradores"
+    assert_that(product_body).snapshot()
