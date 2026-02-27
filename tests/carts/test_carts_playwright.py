@@ -1,27 +1,31 @@
 import json
 import os
+from pathlib import Path
 
 import allure
 from assertpy import assert_that
+from dotenv import load_dotenv
 from playwright.sync_api import APIRequestContext
 
 from tests.utils.api_utils import JSON_HEADERS, parse_response_body, post_json
 from tests.utils.faker_utils import random_email, random_product
 
+load_dotenv(Path(__file__).resolve().parents[2] / "user.env")
+USER_PASSWORD = os.getenv("USER_PASSWORD")
+
 
 def login_with_default_payload(request: APIRequestContext) -> str:
     user_email = random_email()
-    user_password = os.getenv("TEST_USER_PASSWORD", "SenhaSegura@123")
 
     new_user = {
         "nome": "Cart Default User",
         "email": user_email,
-        "password": user_password,
+        "password": USER_PASSWORD,
         "administrador": "true",
     }
 
     post_json(request, "/usuarios", new_user)
-    resp = post_json(request, "/login", {"email": user_email, "password": user_password})
+    resp = post_json(request, "/login", {"email": user_email, "password": USER_PASSWORD})
     assert_that(resp.status).is_equal_to(200)
 
     login_body = parse_response_body(resp)
@@ -30,17 +34,16 @@ def login_with_default_payload(request: APIRequestContext) -> str:
 
 def create_admin_user_and_get_token(request: APIRequestContext) -> str:
     user_email = random_email()
-    user_password = os.getenv("TEST_USER_PASSWORD", "SenhaSegura@123")
 
     new_user = {
         "nome": "Cart User",
         "email": user_email,
-        "password": user_password,
+        "password": USER_PASSWORD,
         "administrador": "true",
     }
 
     post_json(request, "/usuarios", new_user)
-    resp = post_json(request, "/login", {"email": user_email, "password": user_password})
+    resp = post_json(request, "/login", {"email": user_email, "password": USER_PASSWORD})
     assert_that(resp.status).is_equal_to(200)
 
     login_body = parse_response_body(resp)
