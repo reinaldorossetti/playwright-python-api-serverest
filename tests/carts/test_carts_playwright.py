@@ -1,4 +1,5 @@
 import json
+import os
 
 import allure
 from assertpy import assert_that
@@ -10,7 +11,7 @@ from tests.utils.faker_utils import random_email, random_product
 
 def login_with_default_payload(request: APIRequestContext) -> str:
     user_email = random_email()
-    user_password = "SenhaSegura@123"
+    user_password = os.getenv("TEST_USER_PASSWORD", "SenhaSegura@123")
 
     new_user = {
         "nome": "Cart Default User",
@@ -29,7 +30,7 @@ def login_with_default_payload(request: APIRequestContext) -> str:
 
 def create_admin_user_and_get_token(request: APIRequestContext) -> str:
     user_email = random_email()
-    user_password = "SenhaSegura@123"
+    user_password = os.getenv("TEST_USER_PASSWORD", "SenhaSegura@123")
 
     new_user = {
         "nome": "Cart User",

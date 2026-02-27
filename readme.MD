@@ -24,8 +24,10 @@ Testes realizados na API com Python + Pytest: [TESTING_API_PYTHON.MD](TESTING_AP
 - [Instalação](#-instalação)
 - [Executando os Testes](#-executando-os-testes)
 - [Exemplos de Testes](#-exemplos-de-testes)
+- [assert_that — Assertpy](#-assert_that--assertpy)
 - [Funcionalidades do Playwright](#-funcionalidades-do-playwright)
 - [Relatórios](#-relatórios)
+- [Allure Report — Decorators](#-allure-report--decorators)
 - [Boas Práticas](#-boas-práticas)
 - [Recursos Adicionais](#-recursos-adicionais)
 
@@ -39,7 +41,7 @@ Testes realizados na API com Python + Pytest: [TESTING_API_PYTHON.MD](TESTING_AP
 
 - **🔥 APIRequestContext fluente**: Requisições HTTP com `get`, `post`, `put`, `delete`
 - **🚀 Suporte completo a REST**: operações GET, POST, PUT, PATCH e DELETE com JSON
-- **🎯 Assertions nativas do Python**: validações claras e objetivas com `assert`
+- **🎯 Assertions fluentes com assertpy**: validações legíveis e encadeáveis com `assert_that` da biblioteca `assertpy`
 - **🔄 Contexto reutilizável**: configuração de `base_url`, headers e ciclo de vida via dependências/fixtures do pytest
 - **📊 Integração com Allure**: relatórios ricos de execução com pytest
 - **🧪 Data-Driven Testing**: suporte com `@pytest.mark.parametrize` e leitura de CSV
@@ -182,7 +184,7 @@ def create_user(request: APIRequestContext, email: str, password: str, admin: bo
 
 - Mantenha `pytest.ini` e `conftest.py` otimizados para orquestrar setup/teardown.
 - Use dicionários nativos para body das requisições, ao invés de conversão manual de texto.
-- Foque na clareza do código, usando as asserções nativas (`assert`).
+- Use `assert_that` da biblioteca `assertpy` para asserções fluentes, legíveis e com mensagens de erro detalhadas (ex: `assert_that(resp.status).is_equal_to(200)`).
 
 ---
 
@@ -194,6 +196,7 @@ def create_user(request: APIRequestContext, email: str, password: str, admin: bo
 | `playwright`                       | 1.58.0  | Engine para chamadas e requisições HTTP |
 | `pytest-xdist`                     | 3.8.0   | Suporte à execução simultânea e multiprocessos |
 | `allure-pytest`                    | 2.15.3  | Geração unificada de relatórios visuais com Allure |
+| `assertpy`                         | 1.1     | Assertions fluentes com `assert_that` |
 
 ---
 
@@ -313,6 +316,11 @@ def api_request(playwright_instance: Playwright):
 ### Exemplo 2: Login com sucesso
 
 ```python
+import allure
+from assertpy import assert_that
+from playwright.sync_api import APIRequestContext
+from tests.utils.api_utils import post_json, parse_response_body
+
 @allure.severity(allure.severity_level.CRITICAL)
 def test_ct01_login_with_valid_credentials_and_validate_token(api_request: APIRequestContext):
     email = "usuario_valido@email.com"
@@ -320,10 +328,10 @@ def test_ct01_login_with_valid_credentials_and_validate_token(api_request: APIRe
 
     login_resp = post_json(api_request, "/login", {"email": email, "password": password})
 
-    assert login_resp.status == 200
-    body = login_resp.json()
-    assert body["message"] == "Login realizado com sucesso"
-    assert body.get("authorization") is not None
+    assert_that(login_resp.status).is_equal_to(200)
+    body = parse_response_body(login_resp)
+    assert_that(body["message"]).is_equal_to("Login realizado com sucesso")
+    assert_that(body.get("authorization")).is_not_none()
 ```
 
 ### Exemplo 3: Login inválido
@@ -340,9 +348,9 @@ def test_ct02_login_with_invalid_credentials(api_request: APIRequestContext):
         },
     )
 
-    assert resp.status == 401
-    response_body = resp.json()
-    assert response_body["message"] == "Email e/ou senha inválidos"
+    assert_that(resp.status).is_equal_to(401)
+    response_body = parse_response_body(resp)
+    assert_that(response_body["message"]).is_equal_to("Email e/ou senha inválidos")
 ```
 
 ### Exemplo 4: Validação de campos obrigatórios (Data-driven com Pytest)
@@ -352,9 +360,9 @@ def test_ct02_login_with_invalid_credentials(api_request: APIRequestContext):
 @pytest.mark.parametrize("_row", load_required_fields_rows())
 def test_ct03_validate_required_fields_on_login(_row: dict[str, str], api_request: APIRequestContext):
     resp = post_json(api_request, "/login", {"email": "", "password": "senha123"})
-    assert resp.status == 400
-    body = resp.json()
-    assert body.get("email") is not None
+    assert_that(resp.status).is_equal_to(400)
+    body = parse_response_body(resp)
+    assert_that(body.get("email")).is_not_none()
 ```
 
 ### Exemplo 5: Uso de token dinâmico recebido em Auth
@@ -368,29 +376,156 @@ def test_ct04_login_and_use_token_in_protected_route(api_request: APIRequestCont
 
     product_resp = api_request.post(
         "/produtos",
-        headers={"Authorization": auth_token, "Content-Type": "application/json"},
-        data=json.dumps(product_payload),
+        headers={**JSON_HEADERS, "Authorization": auth_token},
+        data=json.dumps(product_payload, ensure_ascii=False),
     )
 
-    assert product_resp.status == 403
-    assert product_resp.json()["message"] == "Rota exclusiva para administradores"
+    assert_that(product_resp.status).is_equal_to(403)
+    body = parse_response_body(product_resp)
+    assert_that(body["message"]).is_equal_to("Rota exclusiva para administradores")
 ```
 
 ### Exemplo 6: Teste iterando em arquivos CSV via Pathlib
 
 ```python
+from pathlib import Path
+import csv
+
 def load_invalid_email_values() -> list[str]:
-    # Utilizando Path do Python
-    pass
+    csv_path = Path("tests/resources/login/invalid-login-emails.csv")
+    with csv_path.open(encoding="utf-8") as f:
+        return [row["email"] for row in csv.DictReader(f)]
 
 @allure.severity(allure.severity_level.NORMAL)
 @pytest.mark.parametrize("invalid_email", load_invalid_email_values())
 def test_ct05_validate_invalid_email_format(invalid_email: str, api_request: APIRequestContext):
     resp = post_json(api_request, "/login", {"email": invalid_email, "password": "senha123"})
 
-    assert resp.status == 400
-    assert resp.json().get("email") is not None
+    assert_that(resp.status).is_equal_to(400)
+    body = parse_response_body(resp)
+    assert_that(body.get("email")).is_not_none()
 ```
+
+### Exemplo 7: Ciclo completo de carrinho (baseado em `test_carts_playwright.py`)
+
+```python
+import json
+import allure
+from assertpy import assert_that
+from playwright.sync_api import APIRequestContext
+from tests.utils.api_utils import JSON_HEADERS, parse_response_body, post_json
+from tests.utils.faker_utils import random_email, random_product
+
+@allure.severity(allure.severity_level.CRITICAL)
+def test_ct01_full_cart_lifecycle_for_authenticated_user(api_request: APIRequestContext):
+    # Criar usuário admin e obter token
+    user_email = random_email()
+    post_json(api_request, "/usuarios", {"nome": "Cart User", "email": user_email,
+                                          "password": "SenhaSegura@123", "administrador": "true"})
+    login_resp = post_json(api_request, "/login", {"email": user_email, "password": "SenhaSegura@123"})
+    assert_that(login_resp.status).is_equal_to(200)
+    token = parse_response_body(login_resp)["authorization"]
+
+    # Garantir que não há carrinho ativo
+    api_request.delete("/carrinhos/cancelar-compra", headers={"Authorization": token})
+
+    # Criar produto
+    product_resp = api_request.post(
+        "/produtos",
+        headers={**JSON_HEADERS, "Authorization": token},
+        data=json.dumps({"nome": random_product(), "preco": 150,
+                         "descricao": "Produto de teste", "quantidade": 10}, ensure_ascii=False),
+    )
+    assert_that(product_resp.status).is_equal_to(201)
+    product_id = parse_response_body(product_resp)["_id"]
+
+    # Criar carrinho
+    create_cart_resp = api_request.post(
+        "/carrinhos",
+        headers={**JSON_HEADERS, "Authorization": token},
+        data=json.dumps({"produtos": [{"idProduto": product_id, "quantidade": 2}]}, ensure_ascii=False),
+    )
+    assert_that(create_cart_resp.status).is_equal_to(201)
+    cart_id = parse_response_body(create_cart_resp)["_id"]
+
+    # Buscar carrinho por ID e validar campos
+    get_cart_resp = api_request.get(f"/carrinhos/{cart_id}")
+    assert_that(get_cart_resp.status).is_equal_to(200)
+    cart_body = parse_response_body(get_cart_resp)
+    assert_that(cart_body["_id"]).is_equal_to(cart_id)
+    assert_that(cart_body.get("precoTotal")).is_not_none()
+    assert_that(cart_body.get("quantidadeTotal")).is_not_none()
+    assert_that(len(cart_body["produtos"])).is_equal_to(1)
+
+    # Concluir compra
+    conclude_resp = api_request.delete("/carrinhos/concluir-compra", headers={"Authorization": token})
+    assert_that(conclude_resp.status).is_equal_to(200)
+    assert_that(parse_response_body(conclude_resp)["message"]).contains("Registro excluído com sucesso")
+```
+
+---
+
+## ✅ assert_that — Assertpy
+
+Todos os testes deste projeto utilizam `assert_that` da biblioteca [assertpy](https://github.com/assertpy/assertpy) para realizar asserções fluentes, legíveis e com mensagens de erro detalhadas.
+
+### Importação
+
+```python
+from assertpy import assert_that
+```
+
+### Principais métodos
+
+| Método                              | O que valida                                           |
+|-------------------------------------|--------------------------------------------------------|
+| `.is_equal_to(value)`               | Igualdade exata                                        |
+| `.is_not_equal_to(value)`           | Diferença entre valores                                |
+| `.is_not_none()`                    | Valor não é `None`                                     |
+| `.is_none()`                        | Valor é `None`                                         |
+| `.contains(substr)`                 | String ou lista contém o valor informado               |
+| `.does_not_contain(substr)`         | String ou lista não contém o valor                     |
+| `.is_true()` / `.is_false()`        | Booleano verdadeiro / falso                            |
+| `.is_greater_than(n)`               | Numérico maior que `n`                                 |
+| `.is_less_than(n)`                  | Numérico menor que `n`                                 |
+| `.is_between(a, b)`                 | Numérico dentro do intervalo `[a, b]`                  |
+| `.is_length(n)`                     | Sequência com tamanho exato `n`                        |
+| `.is_empty()` / `.is_not_empty()`   | Sequência vazia ou não vazia                           |
+| `.has_size(n)`                      | Coleção com `n` elementos                              |
+| `.snapshot()`                       | Compara com snapshot salvo em `__snapshots/`           |
+
+### Exemplo com status e corpo da resposta
+
+```python
+from assertpy import assert_that
+from tests.utils.api_utils import parse_response_body
+
+resp = api_request.get("/usuarios")
+assert_that(resp.status).is_equal_to(200)
+
+body = parse_response_body(resp)
+assert_that(body.get("quantidade")).is_greater_than(0)
+assert_that(body.get("usuarios")).is_not_empty()
+```
+
+### Encadeamento de asserções
+
+```python
+assert_that(body["message"]) \
+    .is_not_none() \
+    .contains("sucesso")
+```
+
+### Snapshot testing
+
+O método `.snapshot()` grava a resposta na primeira execução e nas seguintes verifica se o conteúdo é idêntico. Os arquivos ficam em `__snapshots/`.
+
+```python
+body = parse_response_body(resp)
+assert_that(body).snapshot()   # cria ou valida __snapshots/<nome>.json
+```
+
+> Para resetar um snapshot, apague o arquivo correspondente em `__snapshots/` e execute o teste novamente.
 
 ---
 
@@ -467,24 +602,77 @@ O dashboard exibe:
 - 📋 Stack Trace de Erros
 - 📊 Análise das execuções em timeline
 
-### 🏷️ Exemplos de marcações Allure nos Testes (Decorators)
+### 🏷️ Allure Report — Decorators
 
-O plugin `allure-pytest` suporta metadados extremamente ricos em cima das functions diretamente:
+O plugin `allure-pytest` suporta metadados extremamente ricos em cima das funções de teste. Todos os decorators abaixo são importados de `import allure`.
+
+#### Decorators disponíveis
+
+| Decorator                               | Descrição                                              | Exemplo                                              |
+|-----------------------------------------|--------------------------------------------------------|------------------------------------------------------|
+| `@allure.severity(level)`               | Define a criticidade do teste                          | `@allure.severity(allure.severity_level.CRITICAL)`   |
+| `@allure.title("Título")`               | Título legível exibido no relatório                    | `@allure.title("CT01 - Login válido")`               |
+| `@allure.description("Descrição")`      | Descrição longa do teste                               | `@allure.description("Valida token JWT retornado")`  |
+| `@allure.description_html("html")`      | Descrição em HTML                                      | `@allure.description_html("<b>Login</b>")`           |
+| `@allure.feature("Feature")`            | Agrupa testes por funcionalidade                       | `@allure.feature("Login")`                           |
+| `@allure.story("Story")`                | Subdivide features em histórias                        | `@allure.story("Login com credenciais válidas")`     |
+| `@allure.epic("Epic")`                  | Agrupa features em épicos (maior granularidade)        | `@allure.epic("Autenticação")`                       |
+| `@allure.tag("tag1", "tag2")`           | Tags livres para categorização                         | `@allure.tag("smoke", "regression")`                 |
+| `@allure.label("name", "value")`        | Label customizado de formato chave-valor               | `@allure.label("layer", "api")`                      |
+| `@allure.link(url, name="texto")`       | Link genérico no relatório                             | `@allure.link("https://serverest.dev")`              |
+| `@allure.issue(url, name="texto")`      | Link para issue/bug tracker                            | `@allure.issue("https://github.com/org/repo/1")`    |
+| `@allure.testcase(url, name="texto")`   | Link para caso de teste em ferramenta de gestão        | `@allure.testcase("https://jira.example.com/TC-1")` |
+
+#### Níveis de severidade (`allure.severity_level`)
+
+| Constante                          | Uso                                        |
+|------------------------------------|--------------------------------------------|
+| `allure.severity_level.BLOCKER`    | Impede a execução; bloqueia o release      |
+| `allure.severity_level.CRITICAL`   | Fluxo principal; falha impacta diretamente |
+| `allure.severity_level.NORMAL`     | Importante, mas não bloqueia o fluxo core  |
+| `allure.severity_level.MINOR`      | Pouco impacto; melhoria ou detalhe         |
+| `allure.severity_level.TRIVIAL`    | Cosmético ou edge case irrelevante         |
+
+#### Steps dentro dos testes
 
 ```python
 import allure
 
-@allure.severity(allure.severity_level.CRITICAL)
+# Context manager — passo nomeado no relatório
+with allure.step("Criar usuário administrador"):
+    post_json(request, "/usuarios", new_user)
+
+# Decorator — reutilizável em funções helper
+@allure.step("Fazer login e obter token")
+def get_token(request, email, password):
+    resp = post_json(request, "/login", {"email": email, "password": password})
+    return parse_response_body(resp)["authorization"]
+```
+
+#### Exemplo completo com todas as anotações
+
+```python
+import allure
+from assertpy import assert_that
+from playwright.sync_api import APIRequestContext
+from tests.utils.api_utils import post_json, parse_response_body
+
+@allure.epic("Autenticação")
 @allure.feature("Login")
 @allure.story("Login com credenciais inválidas")
+@allure.severity(allure.severity_level.CRITICAL)
+@allure.title("CT02 - Login com credenciais inválidas retorna 401")
 @allure.description("Valida que o endpoint retorna 401 para credencial incorreta de usuário")
-@allure.issue("SRV-123")
+@allure.tag("smoke", "regression")
+@allure.issue("https://github.com/ServeRest/ServeRest/issues/1", name="SRV-123")
 def test_ct02_login_with_invalid_credentials(api_request: APIRequestContext):
-    with allure.step("Realizar post com credencial incorreta"):
-        resp = api_request.post("/login", data={"email": "...", "password": "..."})
+    with allure.step("Realizar POST com credencial incorreta"):
+        resp = post_json(api_request, "/login", {"email": "usuario@inexistente.com", "password": "senhaerrada"})
 
-    with allure.step("Validar assert no status do endpoint login"):
-        assert resp.status == 401
+    with allure.step("Validar status 401 e mensagem de erro"):
+        assert_that(resp.status).is_equal_to(401)
+        body = parse_response_body(resp)
+        assert_that(body["message"]).is_equal_to("Email e/ou senha inválidos")
 ```
 
 ---
