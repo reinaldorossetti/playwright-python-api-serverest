@@ -25,6 +25,7 @@ Testes realizados na API com Python + Pytest: [TESTING_API_PYTHON.MD](TESTING_AP
 - [Executando os Testes](#-executando-os-testes)
 - [Exemplos de Testes](#-exemplos-de-testes)
 - [assert_that — Assertpy](#-assert_that--assertpy)
+- [Variáveis de Ambiente — python-dotenv](#-variáveis-de-ambiente--python-dotenv)
 - [Funcionalidades do Playwright](#-funcionalidades-do-playwright)
 - [Relatórios](#-relatórios)
 - [Allure Report — Decorators](#-allure-report--decorators)
@@ -119,6 +120,7 @@ playwright-python-api-serverest/
 │
 ├── pytest.ini                           # Configurações gerais do pytest (dist e allure)
 ├── requirements.txt                     # Dependências do projeto Python
+├── user.env                             # Variáveis de ambiente locais (NÃO versionado — ver .gitignore)
 ├── TESTING_API_PYTHON.MD                # Documentação dos cenários de teste em Python
 └── readme.MD                            # Este arquivo
 ```
@@ -197,6 +199,7 @@ def create_user(request: APIRequestContext, email: str, password: str, admin: bo
 | `pytest-xdist`                     | 3.8.0   | Suporte à execução simultânea e multiprocessos |
 | `allure-pytest`                    | 2.15.3  | Geração unificada de relatórios visuais com Allure |
 | `assertpy`                         | 1.1     | Assertions fluentes com `assert_that` |
+| `python-dotenv`                    | 1.0.1   | Carrega variáveis de ambiente de arquivos `.env` |
 
 ---
 
@@ -410,19 +413,26 @@ def test_ct05_validate_invalid_email_format(invalid_email: str, api_request: API
 
 ```python
 import json
+import os
+from pathlib import Path
+
 import allure
 from assertpy import assert_that
+from dotenv import load_dotenv
 from playwright.sync_api import APIRequestContext
 from tests.utils.api_utils import JSON_HEADERS, parse_response_body, post_json
 from tests.utils.faker_utils import random_email, random_product
+
+load_dotenv(Path(__file__).resolve().parents[2] / "user.env")
+USER_PASSWORD = os.getenv("USER_PASSWORD")
 
 @allure.severity(allure.severity_level.CRITICAL)
 def test_ct01_full_cart_lifecycle_for_authenticated_user(api_request: APIRequestContext):
     # Criar usuário admin e obter token
     user_email = random_email()
     post_json(api_request, "/usuarios", {"nome": "Cart User", "email": user_email,
-                                          "password": "SenhaSegura@123", "administrador": "true"})
-    login_resp = post_json(api_request, "/login", {"email": user_email, "password": "SenhaSegura@123"})
+                                          "password": USER_PASSWORD, "administrador": "true"})
+    login_resp = post_json(api_request, "/login", {"email": user_email, "password": USER_PASSWORD})
     assert_that(login_resp.status).is_equal_to(200)
     token = parse_response_body(login_resp)["authorization"]
 
@@ -526,6 +536,72 @@ assert_that(body).snapshot()   # cria ou valida __snapshots/<nome>.json
 ```
 
 > Para resetar um snapshot, apague o arquivo correspondente em `__snapshots/` e execute o teste novamente.
+
+---
+
+## 🔐 Variáveis de Ambiente — python-dotenv
+
+O projeto utiliza [python-dotenv](https://github.com/theskumar/python-dotenv) para carregar dados sensíveis (como senhas) a partir de um arquivo `.env` local, evitando que credenciais fiquem hardcoded nos testes.
+
+### Arquivo `user.env`
+
+Criado na raiz do projeto e **não versionado** (listado no `.gitignore`):
+
+```dotenv
+USER_PASSWORD=SenhaSegura@123
+```
+
+> Para criar o seu próprio, copie o exemplo acima e ajuste o valor conforme necessário.
+
+### Como é usado nos testes
+
+Em `tests/carts/test_carts_playwright.py`, o arquivo é carregado no nível do módulo com o caminho resolvido dinamicamente via `Path`:
+
+```python
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Sobe 2 níveis a partir de tests/carts/ até a raiz do projeto
+load_dotenv(Path(__file__).resolve().parents[2] / "user.env")
+
+USER_PASSWORD = os.getenv("USER_PASSWORD")
+```
+
+A constante `USER_PASSWORD` é então usada diretamente nos payloads de criação de usuário e login:
+
+```python
+new_user = {
+    "nome": "Cart User",
+    "email": user_email,
+    "password": USER_PASSWORD,
+    "administrador": "true",
+}
+
+post_json(request, "/usuarios", new_user)
+resp = post_json(request, "/login", {"email": user_email, "password": USER_PASSWORD})
+```
+
+### Por que usar `Path(__file__).resolve().parents[2]`?
+
+O `Path(__file__)` corresponde ao arquivo de teste atual. `.parents[2]` sobe dois diretórios na hierarquia:
+
+```
+tests/carts/test_carts_playwright.py
+  └── parents[0] → tests/carts/
+  └── parents[1] → tests/
+  └── parents[2] → <raiz do projeto>  ← user.env está aqui
+```
+
+Isso garante que o carregamento funciona independentemente do diretório de trabalho onde o pytest é executado.
+
+### Variável não encontrada
+
+Se `user.env` não existir ou a variável não estiver definida, `os.getenv("USER_PASSWORD")` retorna `None`, causando falha nos testes com mensagem clara. Para evitar isso, use um valor padrão de fallback:
+
+```python
+USER_PASSWORD = os.getenv("USER_PASSWORD", "SenhaSegura@123")
+```
 
 ---
 
