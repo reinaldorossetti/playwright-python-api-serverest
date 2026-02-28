@@ -32,7 +32,6 @@ jobs:
         run: playwright install chromium
 
       - name: Run Pytest tests
-        # We use continue-on-error so the report is still generated if tests fail
         run: pytest
         continue-on-error: true
 
