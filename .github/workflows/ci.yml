@@ -45,11 +45,10 @@ jobs:
           allure generate allure-results -o allure-report --clean
 
       - name: Deploy Allure report to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@v5
         if: always()
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: allure-report
-          # Define a pasta destino para combinar com a URL do README
           destination_dir: allure-reports
