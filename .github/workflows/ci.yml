@@ -35,23 +35,14 @@ jobs:
         run: pytest
         continue-on-error: true
 
-      - name: Get Allure history
-        uses: actions/checkout@v4
+      - name: Install Allure CLI via npm
         if: always()
-        continue-on-error: true
-        with:
-          ref: gh-pages
-          path: gh-pages
+        run: npm install -g allure-commandline
 
       - name: Generate Allure Report
-        uses: simple-elf/allure-report-action@master
         if: always()
-        id: allure-report
-        with:
-          allure_results: allure-results
-          gh_pages: gh-pages
-          allure_report: allure-report
-          allure_history: allure-history
+        run: |
+          allure generate allure-results -o allure-report --clean
 
       - name: Deploy Allure report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -59,6 +50,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: allure-history
+          publish_dir: allure-report
           # Define a pasta destino para combinar com a URL do README
           destination_dir: allure-reports
