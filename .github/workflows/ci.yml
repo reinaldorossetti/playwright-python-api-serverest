@@ -1,4 +1,4 @@
-name: Playwright API Tests
+name: Playwright API Tests - Python
 
 on:
   push:
